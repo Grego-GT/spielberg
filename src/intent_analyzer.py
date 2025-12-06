@@ -105,6 +105,8 @@ Generate a JSON response with this exact structure:
 
 Guidelines:
 - Keep actor names short, descriptive, and URL-friendly
+- **CRITICAL: Keep description under 250 characters (maximum 300 allowed)**
+- Description should be concise, clear, and actionable
 - Choose appropriate input field types and editors
 - Suggest realistic dependencies (prefer built-in libraries when possible)
 - For scrapers, include URL input fields
