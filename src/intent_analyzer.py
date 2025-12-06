@@ -21,7 +21,7 @@ class IntentAnalyzer:
             openai_api_key: OpenAI API key for GPT-4 access
         """
         self.client = AsyncOpenAI(api_key=openai_api_key)
-        self.model = "gpt-4-turbo-preview"
+        self.model = "gpt-5-mini-2025-08-07"
     
     async def analyze(self, user_prompt: str) -> Dict[str, Any]:
         """Analyze user prompt and generate structured requirements.
