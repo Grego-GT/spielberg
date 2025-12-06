@@ -1,0 +1,17 @@
+{
+	"title": "Spielberg Actor Generator Input",
+	"type": "object",
+	"schemaVersion": 1,
+	"properties": {
+		"userPrompt": {
+			"title": "Actor Description",
+			"type": "string",
+			"description": "Describe what you want your Actor to do in natural language. Be as specific as possible about the functionality, inputs, and outputs.",
+			"editor": "textarea",
+			"example": "Create an Actor that scrapes product prices from Amazon and saves them to a dataset",
+			"prefill": "Create an Actor that logs 'Hello World' and saves it to a dataset"
+		}
+	},
+	"required": ["userPrompt"]
+}
+
