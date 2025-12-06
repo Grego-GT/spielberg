@@ -25,7 +25,7 @@ class ActorValidator:
         self.openai_client = AsyncOpenAI(api_key=openai_api_key)
         self.deployer = ActorDeployer(apify_token)
         self.generator = ActorGenerator(openai_api_key)
-        self.model = "gpt-4-turbo-preview"
+        self.model = "gpt-5-mini-2025-08-07"
     
     async def validate_and_fix(
         self, 
@@ -208,7 +208,7 @@ Only include files that need to be changed. Return valid JSON only."""
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.3,
+                temperature=1,
                 response_format={"type": "json_object"}
             )
             

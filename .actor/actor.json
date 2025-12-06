@@ -5,17 +5,5 @@
   "description": "Meta-actor that generates and deploys custom Apify Actors from natural language descriptions using OpenAI GPT-4",
   "version": "1.0",
   "buildTag": "latest",
-  "meta": {
-    "templateId": "python-empty",
-    "generatedBy": "claude-sonnet-4.5"
-  },
-  "dockerfile": "../Dockerfile",
-  "environmentVariables": {
-    "OPENAI_API_KEY": {
-      "title": "OpenAI API Key",
-      "type": "string",
-      "description": "Your OpenAI API key for GPT-4 access. Get it from https://platform.openai.com/api-keys",
-      "isSecret": true
-    }
-  }
+  "dockerfile": "./Dockerfile"
 }

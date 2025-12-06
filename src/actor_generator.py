@@ -20,7 +20,7 @@ class ActorGenerator:
             openai_api_key: OpenAI API key for GPT-4 access
         """
         self.client = AsyncOpenAI(api_key=openai_api_key)
-        self.model = "gpt-4-turbo-preview"
+        self.model = "gpt-5-mini-2025-08-07"
     
     async def generate(self, requirements: Dict[str, Any]) -> Dict[str, str]:
         """Generate complete Actor source code from requirements.
@@ -113,8 +113,8 @@ Generate complete, production-ready Python code following Apify best practices."
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.3,
-                max_tokens=3000
+                temperature=1,
+                max_completion_tokens=3000
             )
             
             code = response.choices[0].message.content
@@ -136,29 +136,99 @@ Generate complete, production-ready Python code following Apify best practices."
         """Get system prompt for main.py generation."""
         return """You are an expert Python developer specializing in Apify Actors.
 
-Generate a complete, production-ready main.py file that:
-1. Uses the Apify SDK properly with async/await patterns
-2. Follows the structure: async def main() -> None with async with Actor
-3. Validates input using Actor.get_input()
-4. Implements proper error handling with try/except blocks
-5. Uses Actor.log for logging at key points
-6. Saves output data using Actor.push_data()
-7. Includes comprehensive docstrings
-8. Follows PEP 8 style guidelines
-9. Handles edge cases gracefully
-10. Exits properly with await Actor.exit()
+OFFICIAL DOCUMENTATION REFERENCES:
+- Full Apify Documentation: https://docs.apify.com/llms-full.txt
+- Apify MCP Tools: https://mcp.apify.com/?tools=actors,docs,runs,storage
+- Apify Python SDK: https://docs.apify.com/sdk/python
 
-Best Practices:
-- Import required packages at the top
-- Validate all inputs before processing
-- Log progress at major steps
-- Use descriptive variable names
-- Add helpful comments for complex logic
-- Handle errors gracefully with informative messages
-- Always use async with Actor context manager
-- Save data incrementally when possible
+Generate a complete, production-ready main.py file following official Apify best practices.
 
-Generate ONLY the Python code, no explanations. Start with imports and end with the main() function."""
+CRITICAL RULES (from official docs):
+1. NEVER reject input with errors - Actors should gracefully handle any input (even empty/None)
+2. Use 'async with Actor:' context manager (NOT 'async with Actor() as actor:')
+3. Use 'await Actor.get_input()' to get input (returns None if no input provided)
+4. If no input is needed, simply ignore it - don't raise errors
+5. Use 'await Actor.push_data()' to save results to dataset
+6. Always use 'Actor.log.info()' for logging (not actor.log.info)
+7. The Actor SDK automatically handles initialization and cleanup
+
+REQUIRED STRUCTURE (Apify SDK v3.x pattern):
+```python
+from apify import Actor
+
+async def main() -> None:
+    \"\"\"Main Actor entry point.\"\"\"
+    async with Actor:
+        # Get input - returns None if not provided (this is NORMAL and OK!)
+        actor_input = await Actor.get_input() or {}
+        
+        # Log start
+        Actor.log.info('Actor starting...')
+        
+        # Your Actor logic here
+        result = process_data(actor_input)
+        
+        # Save results to dataset
+        await Actor.push_data(result)
+        
+        Actor.log.info('Actor finished successfully')
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
+```
+
+BEST PRACTICES FROM OFFICIAL APIFY DOCUMENTATION:
+- Accept well-defined JSON input and produce structured JSON output
+- Validate input with proper error handling but NEVER reject empty/None input
+- Use Actor.log methods: .info(), .warning(), .error(), .debug()
+- Use Actor.push_data() for dataset items (can be called multiple times)
+- Use Actor.set_value() for key-value store items
+- Clean and validate data before pushing to dataset
+- Handle errors gracefully with try/except and informative messages
+- Exit automatically via context manager - no manual Actor.exit() needed
+- For scrapers: use CheerioCrawler for static HTML (10x faster than browsers)
+- For browser automation: use PlaywrightCrawler for JavaScript-heavy sites
+
+KEY APIFY SDK METHODS:
+- Actor.get_input() → dict | None (get input, returns None if empty)
+- Actor.push_data(item) → None (save to dataset)
+- Actor.set_value(key, value) → None (save to key-value store)
+- Actor.log.info/warning/error/debug(message) → None (logging)
+
+COMMON MISTAKES TO AVOID:
+- ❌ DON'T: if input_data is not None: raise ValueError("No input expected")
+- ❌ DON'T: async with Actor() as actor: (wrong syntax)
+- ❌ DON'T: actor.log.info() (use Actor.log.info instead)
+- ❌ DON'T: await Actor.exit() (context manager handles this)
+- ❌ DON'T: Reject None or empty input
+- ✅ DO: actor_input = await Actor.get_input() or {}
+- ✅ DO: async with Actor: (correct syntax)
+- ✅ DO: Actor.log.info('message') (class method, not instance)
+- ✅ DO: Accept and gracefully handle unexpected input fields
+- ✅ DO: Use try/except for error handling
+
+REFERENCE EXAMPLE FROM APIFY DOCS:
+```python
+from apify import Actor
+
+async def main() -> None:
+    async with Actor:
+        Actor.log.info('Hello from the Actor!')
+        actor_input = await Actor.get_input() or {}
+        
+        # Process data
+        data = {'message': 'Hello World', 'input_received': actor_input}
+        
+        # Save to dataset
+        await Actor.push_data(data)
+
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
+```
+
+Generate ONLY the Python code following these patterns. No markdown formatting, no explanations."""
     
     def _generate_actor_json(self, requirements: Dict[str, Any]) -> str:
         """Generate actor.json configuration.
