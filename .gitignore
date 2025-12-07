@@ -35,3 +35,4 @@ apify_storage/
 *.pem
 *.key
 
+.claude/
