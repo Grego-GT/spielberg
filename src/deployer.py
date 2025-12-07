@@ -25,32 +25,66 @@ class ActorDeployer:
         
         self.client = ApifyClientAsync(token=token)
     
+    async def _find_actor_by_name(self, actor_name: str) -> Optional[Dict[str, Any]]:
+        """Find an actor by name.
+
+        Args:
+            actor_name: Name of the actor to find
+
+        Returns:
+            Actor object if found, None otherwise
+        """
+        try:
+            # List all actors and find by name
+            actors_list = await self.client.actors().list()
+            # Handle both dict and ListPage objects
+            items = actors_list.items if hasattr(actors_list, 'items') else actors_list.get('items', [])
+            for actor in items:
+                actor_dict = actor if isinstance(actor, dict) else actor.to_dict() if hasattr(actor, 'to_dict') else {}
+                if actor_dict.get('name') == actor_name:
+                    return actor_dict
+            return None
+        except Exception as e:
+            Actor.log.warning(f"Error finding actor by name: {str(e)}")
+            return None
+
     async def deploy(self, actor_files: Dict[str, str], actor_name: str) -> Dict[str, Any]:
         """Deploy Actor to Apify platform.
-        
+
         Args:
             actor_files: Dictionary mapping file paths to contents
             actor_name: Name for the Actor
-            
+
         Returns:
             Dictionary with actor_id, build_id, and deployment info
-            
+
         Raises:
             Exception: If deployment fails
         """
         Actor.log.info(f"Starting deployment for Actor: {actor_name}")
-        
+
         try:
-            # Step 1: Create the Actor (with version 0.1 already included)
-            actor = await self._create_actor(actor_files, actor_name)
-            actor_id = actor['id']
-            Actor.log.info(f"Created Actor with ID: {actor_id}")
-            
+            # Check if actor already exists
+            existing_actor = await self._find_actor_by_name(actor_name)
+
+            if existing_actor:
+                Actor.log.info(f"Actor '{actor_name}' already exists, updating version...")
+                actor_id = existing_actor['id']
+
+                # Update the existing version
+                await self.update_actor_version(actor_id, '0.1', actor_files)
+                Actor.log.info(f"Updated Actor with ID: {actor_id}")
+            else:
+                # Step 1: Create the Actor (with version 0.1 already included)
+                actor = await self._create_actor(actor_files, actor_name)
+                actor_id = actor['id']
+                Actor.log.info(f"Created Actor with ID: {actor_id}")
+
             # Step 2: Trigger build (version was already created in step 1)
             build = await self._trigger_build(actor_id)
             build_id = build['id']
             Actor.log.info(f"Triggered build with ID: {build_id}")
-            
+
             return {
                 'actor_id': actor_id,
                 'build_id': build_id,
@@ -58,7 +92,7 @@ class ActorDeployer:
                 'console_url': f"https://console.apify.com/actors/{actor_id}",
                 'status': 'building'
             }
-            
+
         except Exception as e:
             Actor.log.error(f"Deployment failed: {str(e)}")
             raise Exception(f"Failed to deploy Actor: {str(e)}")

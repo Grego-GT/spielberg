@@ -44,15 +44,15 @@ async def main() -> None:
                 raise ValueError("userPrompt is required")
             
             Actor.log.info(f"User prompt: {user_prompt}")
-            
-            # Validate OpenAI API key
-            openai_api_key = os.environ.get('OPENAI_API_KEY')
-            if not openai_api_key:
+
+            # Validate Anthropic API key
+            anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
+            if not anthropic_api_key:
                 raise ValueError(
-                    "OPENAI_API_KEY environment variable is required. "
+                    "ANTHROPIC_API_KEY environment variable is required. "
                     "Please set it in Actor settings under Environment variables."
                 )
-            
+
             Actor.log.info("✓ Input validated")
             
             # Step 2: Analyze intent and generate requirements
