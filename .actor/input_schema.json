@@ -10,6 +10,13 @@
 			"editor": "textarea",
 			"example": "Create an Actor that scrapes product prices from Amazon and saves them to a dataset",
 			"prefill": "Create an Actor that logs 'Hello World' and saves it to a dataset"
+		},
+		"apifyToken": {
+			"title": "Apify API Token",
+			"type": "string",
+			"description": "Your Apify API token. Required for deploying the generated Actor. Find it at https://console.apify.com/account/integrations",
+			"editor": "textfield",
+			"isSecret": true
 		}
 	},
 	"required": ["userPrompt"]

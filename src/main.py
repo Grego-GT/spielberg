@@ -38,12 +38,23 @@ async def main() -> None:
             actor_input = await Actor.get_input()
             if not actor_input:
                 raise ValueError("No input provided")
-            
+
             user_prompt = actor_input.get('userPrompt')
             if not user_prompt:
                 raise ValueError("userPrompt is required")
-            
+
             Actor.log.info(f"User prompt: {user_prompt}")
+
+            # Get Apify token from input or environment
+            apify_token = actor_input.get('apifyToken') or os.environ.get('APIFY_TOKEN')
+            if apify_token:
+                # Set it as environment variable for deployer to use
+                os.environ['APIFY_TOKEN'] = apify_token
+            else:
+                raise ValueError(
+                    "Apify API token is required. "
+                    "Please provide it in the 'apifyToken' input field or set APIFY_TOKEN environment variable."
+                )
 
             # Validate Anthropic API key
             anthropic_api_key = os.environ.get('ANTHROPIC_API_KEY')
