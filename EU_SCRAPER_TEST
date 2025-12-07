@@ -1,0 +1,190 @@
+import requests
+from typing import Any, Dict, List, Optional
+
+from apify import Actor
+
+# Official EC Search API endpoint
+SEARCH_API_URL = "https://api.tech.ec.europa.eu/search-api/prod/rest/search"
+API_KEY = "SEDIA_NONH2020_PROD"
+
+DEFAULT_PAGE_SIZE = 50
+DEFAULT_MAX_PAGES = 10
+HARD_MAX_PAGES = 50  # safety cap, to avoid infinite loops
+
+
+def _setup_session() -> requests.Session:
+    """Configure a requests session with realistic headers."""
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+        }
+    )
+    return session
+
+
+def _build_search_query(keyword: str) -> Dict[str, Any]:
+    """
+    Build the query body for the EC Search API.
+
+    We filter only Funding & Tenders items (type=0).
+    Status filter is NOT applied, so you get all statuses.
+    You can add status terms here if you want only open calls.
+    """
+    query: Dict[str, Any] = {
+        "bool": {
+            "must": [
+                {
+                    "terms": {
+                        "type": ["0"]  # "0" = funding & tenders items
+                    }
+                }
+            ]
+        }
+    }
+    return query
+
+
+def _first_metadata_value(md: Dict[str, Any], key: str) -> str:
+    """Safely extract the first value from metadata[key]."""
+    if key not in md:
+        return ""
+    value = md[key]
+    if isinstance(value, list) and value:
+        return str(value[0])
+    if isinstance(value, str):
+        return value
+    return ""
+
+
+def _parse_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert a single Search API result into a flat dict
+    suitable for pushing to the Apify dataset.
+    """
+    md: Dict[str, Any] = result.get("metadata", {}) or {}
+
+    # Basic fields
+    title = result.get("summary", "") or ""
+    url = result.get("url", "") or ""
+
+    identifier = _first_metadata_value(md, "identifier")
+    reference = _first_metadata_value(md, "reference")
+    programme = _first_metadata_value(md, "programme")
+    status = _first_metadata_value(md, "status")
+
+    # Deadline from endDate (metadata["endDate"] is typically a list)
+    deadline = _first_metadata_value(md, "endDate")
+
+    # Short description (objective)
+    short_description = _first_metadata_value(md, "objective")
+
+    # Budget from overallBudget (list of numbers as strings)
+    budget_raw: Optional[Any] = md.get("overallBudget")
+    budget_str = ""
+    if isinstance(budget_raw, list) and budget_raw:
+        # Join if there is a min/max or multiple entries
+        budget_str = "-".join(str(b) for b in budget_raw if b)
+    elif isinstance(budget_raw, str):
+        budget_str = budget_raw
+
+    if budget_str:
+        budget_str = f"{budget_str} €"
+
+    return {
+        "title": title,
+        "url": url,
+        "identifier": identifier,
+        "reference": reference,
+        "programme": programme,
+        "status": status,
+        "deadline": deadline,
+        "budget": budget_str,
+        "short_description": short_description,
+    }
+
+
+def _fetch_calls_page(
+    session: requests.Session,
+    keyword: str,
+    page: int,
+    page_size: int,
+) -> Dict[str, Any]:
+    """
+    Call the Search API for a specific page and return the JSON response.
+    """
+    params = {
+        "apiKey": API_KEY,
+        "text": keyword if keyword else "*",
+        "pageSize": page_size,
+        "page": page,
+    }
+
+    query_data = _build_search_query(keyword)
+
+    response = session.post(
+        SEARCH_API_URL,
+        params=params,
+        json=query_data,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+async def main() -> None:
+    async with Actor:
+        Actor.log.info(
+            "Initializing Actor (EC Funding & Tenders scraper via official Search API)..."
+        )
+
+        actor_input = await Actor.get_input() or {}
+
+        keyword = (actor_input.get("keyword") or "").strip()
+        page_size = int(actor_input.get("page_size") or DEFAULT_PAGE_SIZE)
+        max_pages = int(actor_input.get("max_pages") or DEFAULT_MAX_PAGES)
+
+        if page_size <= 0:
+            page_size = DEFAULT_PAGE_SIZE
+        if max_pages <= 0 or max_pages > HARD_MAX_PAGES:
+            max_pages = min(DEFAULT_MAX_PAGES, HARD_MAX_PAGES)
+
+        session = _setup_session()
+
+        total_scraped = 0
+
+        for page in range(1, max_pages + 1):
+            Actor.log.info(f"Requesting page {page} from EC Search API ...")
+
+            try:
+                data = _fetch_calls_page(session, keyword, page, page_size)
+            except Exception as e:
+                Actor.log.exception(f"Error fetching page {page}: {e}")
+                break
+
+            results: List[Dict[str, Any]] = data.get("results") or []
+            if not results:
+                Actor.log.info("No more results returned by the API. Stopping.")
+                break
+
+            parsed_rows = [_parse_result(r) for r in results]
+            await Actor.push_data(parsed_rows)
+
+            total_scraped += len(parsed_rows)
+            Actor.log.info(f"Pushed {len(parsed_rows)} calls from page {page}.")
+
+            # Heuristic: last page when fewer than page_size results
+            if len(results) < page_size:
+                Actor.log.info("Last page reached (results < page_size).")
+                break
+
+        Actor.log.info(f"Finished. Total scraped calls: {total_scraped}")
