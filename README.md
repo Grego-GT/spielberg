@@ -2,6 +2,8 @@
 
 **Spielberg** is a meta-actor that generates and deploys custom Apify Actors from natural language descriptions. Simply describe what you want your Actor to do, and Spielberg will create it for you!
 
+Find the actor [here](https://console.apify.com/actors/Yl93bV0rYg5k140at/source)
+
 ## 🎬 Features
 
 - **Natural Language Input**: Describe your Actor in plain English
